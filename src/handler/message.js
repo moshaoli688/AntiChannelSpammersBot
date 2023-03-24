@@ -1,4 +1,4 @@
-import { ChatType, isCommand, log } from "../util/misc.js";
+import { ChatType, hasCommand, log } from "../util/misc.js";
 import Data, { chatsList } from "../util/data.js";
 import { handleCommand } from "./command.js";
 import strings from "../strings/index.js";
@@ -17,7 +17,7 @@ export async function handleMessage(ctx) {
                     if (!chatsList[chatId])
                         chatsList[chatId] = {};
                     log(`Chat ${chatId}: 被加入群组`);
-                    await ctx.replyWithHTML(strings.welcome_group).catch(e => log(`Chat ${chatId}: 发送欢迎消息失败：${e.message}`));
+                    await ctx.reply(strings.welcome_group).catch(e => log(`Chat ${chatId}: 发送欢迎消息失败：${e.message}`));
                 }
             }
         }
@@ -27,13 +27,13 @@ export async function handleMessage(ctx) {
             log(`Chat ${chatId}: 已被移除。`);
             return;
         }
-        if (text && isCommand(text)) {
+        if (text && hasCommand(ctx)) {
             await handleCommand(ctx);
         }
         await judge(ctx);
     }
     else if (chatType === 'private') {
-        if (text && isCommand(text)) {
+        if (text && hasCommand(ctx)) {
             await handleCommand(ctx);
         }
         else ctx.reply(strings.group_only);
@@ -54,7 +54,7 @@ async function judge(ctx) {
                     await ctx.telegram.unpinChatMessage(chatId, msg.message_id).catch(err => {
                         log(`Chat ${chatId}: 取消置顶 (ID ${msg.message_id}) 失败：${err.message}`);
                         if (err.message.includes('not enough rights')) {
-                            ctx.reply(strings.permission_error.replace('{x}', strings.unpin_message))
+                            ctx.reply(strings.permission_error(strings.unpin_message))
                                 .catch((e) => log(`${ctx.message.chat.id}: 发送消息失败：${e.message}`));
                         }
                     });
@@ -89,9 +89,7 @@ export async function deleteMessage(msg, alertOnFailure = true, delay = 0) {
             if (e.message.includes("not enough rights")) {
                 const delMsg = await bot.telegram.sendMessage(
                     chatId,
-                    strings.deleteMsgFailure
-                        .replace('{id}', msgId)
-                        .replace('{err}', e.message)
+                    strings.deleteMsgFailure(msgId, e.message)
                 ).catch(() => null);
                 if (delMsg) {
                     await deleteMessage(delMsg, false, 15000);
@@ -116,7 +114,7 @@ export async function getQueryChatId(ctx) {
     } else {
         queryChatId = msg.text.split(' ')[1];
         if (!queryChatId) {
-            cb = await ctx.replyWithHTML(strings.command_usage_error);
+            cb = await ctx.reply(strings.command_usage_error);
             await deleteMessage(cb, false, 15000);
             return null;
         }
@@ -130,7 +128,7 @@ export async function getQueryChatId(ctx) {
             return null;
         }
     } catch (e) {
-        cb = await ctx.reply(strings.get_channel_error.replace('{code}', e.message));
+        cb = await ctx.reply(strings.get_channel_error(e.message));
         await deleteMessage(cb, false, 15000);
     }
 }

@@ -1,9 +1,9 @@
-import { ChatType, generateKeyboard, isAdmin, log } from "../util/misc.js";
-import Data, { chatsList } from "../util/data.js";
-import { deleteMessage, getQueryChatId } from "./message.js";
-import { admin } from "../../index.js";
-import strings from "../strings/index.js";
-import Analytics from "../util/analytics.js";
+import { ChatType, generateKeyboard, isAdmin, log } from '../util/misc.js';
+import Data, { chatsList } from '../util/data.js';
+import { deleteMessage, getQueryChatId } from './message.js';
+import { admin } from '../../index.js';
+import strings from '../strings/index.js';
+import Analytics from '../util/analytics.js';
 
 export async function handleCommand(ctx) {
     const chatId = ctx.chat.id, fromId = ctx.from.id, chatType = new ChatType(ctx);
@@ -12,6 +12,8 @@ export async function handleCommand(ctx) {
     let mention = command.split('@')[1];
 
     command = command.split('@')[0].slice(1);
+
+    if (command.includes('constructor') || command.includes('prototype')) return;
 
     if (chatType.isGroup()) {
         if (chatsList[chatId].delCmd) {
@@ -27,7 +29,7 @@ export async function handleCommand(ctx) {
                 GroupCommands[command](ctx);
             }
             else {
-                const cb = await ctx.replyWithHTML(strings.operator_not_admin.replace('{id}', msg.from.id));
+                const cb = await ctx.reply(strings.operator_not_admin(msg.from.id));
                 await deleteMessage(cb, false, 15000);
             }
         }
@@ -64,7 +66,7 @@ class GroupCommands {
         }
         else {
             chatsList[chatId].whitelist[targetChatId[0]] = targetChatId[1];
-            cb = await ctx.reply(strings.x_added_to_whitelist.replace('{id}', targetChatId[0]).replace('{x}', targetChatId[1]))
+            cb = await ctx.reply(strings.x_added_to_whitelist(targetChatId[1], targetChatId[0]))
                           .catch((e) => log(`${ctx.message.chat.id}: 发送消息失败：${e.message}`));
         }
         log(`Chat ${chatId}: 白名单添加 ${targetChatId[0]}`);
@@ -78,7 +80,7 @@ class GroupCommands {
             return;
         if (chatsList[chatId].whitelist[targetChatId[0]]) {
             delete chatsList[chatId].whitelist[targetChatId[0]];
-            cb = await ctx.reply(strings.x_removed_from_whitelist.replace('{id}', targetChatId[0]).replace('{x}', targetChatId[1]))
+            cb = await ctx.reply(strings.x_removed_from_whitelist(targetChatId[1], targetChatId[0]))
                           .catch((e) => log(`${ctx.message.chat.id}: 发送消息失败：${e.message}`));
         }
         else {
@@ -96,10 +98,10 @@ class GroupCommands {
             return;
         try {
             await ctx.telegram.banChatSenderChat(chatId, targetChatId[0]);
-            cb = await ctx.replyWithHTML(strings.ban_sender_chat_success.replace('{id}', targetChatId[0]));
+            cb = await ctx.reply(strings.ban_sender_chat_success(targetChatId[0]));
         }
         catch (e) {
-            cb = await ctx.reply(strings.permission_error.replace('{x}', strings.ban_sender_chat))
+            cb = await ctx.reply(strings.permission_error(strings.ban_sender_chat))
                           .catch((e) => log(`${ctx.message.chat.id}: 发送消息失败：${e.message}`));
         }
         log(`Chat ${chatId}: 封禁了 ${targetChatId[0]}`);
@@ -113,10 +115,10 @@ class GroupCommands {
             return;
         try {
             await ctx.telegram.unbanChatSenderChat(chatId, targetChatId[0]);
-            cb = await ctx.replyWithHTML(strings.unban_sender_chat_success.replace('{id}', targetChatId[0]));
+            cb = await ctx.reply(strings.unban_sender_chat_success(targetChatId[0]));
         }
         catch (e) {
-            cb = await ctx.reply(strings.permission_error.replace('{x}', strings.unban_sender_chat))
+            cb = await ctx.reply(strings.permission_error(strings.unban_sender_chat))
                           .catch((e) => log(`${ctx.message.chat.id}: 发送消息失败：${e.message}`));
         }
         log(`Chat ${chatId}: 解封了 ${targetChatId[0]}`);
@@ -124,7 +126,7 @@ class GroupCommands {
     }
 
     static config(ctx) {
-        ctx.replyWithHTML(strings.settings, {
+        ctx.reply(strings.settings, {
             reply_markup: {
                 inline_keyboard: generateKeyboard(ctx.message.chat.id)
             }
@@ -136,7 +138,7 @@ export class GeneralCommands {
     static async start(ctx) {
         try {
             if (new ChatType(ctx).isPrivate())
-                await ctx.replyWithHTML(strings.welcome_private, {
+                await ctx.reply(strings.welcome_private, {
                     reply_markup: {
                         inline_keyboard: [[{
                             text: strings.add_to_group,
@@ -146,7 +148,7 @@ export class GeneralCommands {
                     disable_web_page_preview: true
                 });
             else if (new ChatType(ctx).isGroup())
-                await ctx.replyWithHTML(strings.welcome_group, { disable_web_page_preview: true });
+                await ctx.reply(strings.welcome_group, { disable_web_page_preview: true });
             await deleteMessage(ctx.message, false);
         }
         catch (e) {
@@ -157,9 +159,9 @@ export class GeneralCommands {
         const chatType = new ChatType(ctx);
         try {
             if (chatType.isPrivate())
-                await ctx.replyWithHTML(strings.help, { disable_web_page_preview: true });
+                await ctx.reply(strings.help, { disable_web_page_preview: true });
             else if (chatType.isGroup())
-                await ctx.replyWithHTML(strings.help, {
+                await ctx.reply(strings.help, {
                     disable_web_page_preview: true,
                     reply_markup: {
                         inline_keyboard: [[{ text: strings.deleteMsg, callback_data: 'deleteMsg' }]]
@@ -169,6 +171,9 @@ export class GeneralCommands {
         }
         catch (e) {
         }
+    }
+
+    static async apply() {
     }
 }
 
@@ -180,11 +185,14 @@ class OwnerCommands {
         await ctx.telegram.editMessageText(editMsg.chat.id,
             editMsg.message_id,
             undefined,
-            strings.stats
-                   .replace('{g}', Object.keys(chatsList).length.toString())
-                   .replace('{u1}', result[0].toString())
-                   .replace('{e}', Analytics.activeGroupsCount().toString())
-                   .replace('{u2}', result[1].toString())
+            strings.stats(
+                {
+                    joinedGroups: Object.keys(chatsList).length.toString(),
+                    joinedMembers: result[0].toString(),
+                    enabledGroups: Analytics.activeGroupsCount().toString(),
+                    enabledMembers: result[1].toString()
+                }
+            )
         );
         log(`Analytics: 统计完成`);
     }
@@ -202,7 +210,7 @@ class OwnerCommands {
             ctx.stop('Owner exit');
         }
         else {
-            ctx.replyWithHTML(strings.exit_confirm).catch(() => null);
+            ctx.reply(strings.exit_confirm).catch(() => null);
         }
     }
 

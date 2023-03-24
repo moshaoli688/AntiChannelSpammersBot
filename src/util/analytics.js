@@ -1,6 +1,6 @@
-import Data, { chatsList } from "./data.js";
-import { bot } from "../../index.js";
-import { log } from "./misc.js";
+import Data, { chatsList } from './data.js';
+import { bot } from '../../index.js';
+import { log } from './misc.js';
 
 class Analytics {
     static activeGroupsCount() {
@@ -31,7 +31,8 @@ class Analytics {
                 totalCount += cb;
                 if (chatsList[chat].del)
                     activeCount += cb;
-            } catch (err) {
+            }
+            catch (err) {
                 if (err.message.includes('kicked') ||
                     err.message.includes('not found') ||
                     err.message.includes('upgraded') ||
